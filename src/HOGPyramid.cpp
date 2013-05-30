@@ -59,7 +59,7 @@ pady_(0), interval_(0)
 	cout << " Creating FFLD Pyramid " << padx << " " << interval << endl;
 	// Copmute the number of scales such that the smallest size of the last level is 5
 	const int maxScale = ceil(log(min(image.width(), image.height()) / 40.0) / log(2.0)) * interval;
-	
+	cout << " Max Scale " << maxScale << endl;
 	// Cannot compute the pyramid on images too small
 	if (maxScale < interval)
 		return;
@@ -79,16 +79,20 @@ pady_(0), interval_(0)
 		// First octave at twice the image resolution
 #ifndef FFLD_HOGPYRAMID_FELZENSZWALB_FEATURES
 		Hog(scaled, levels_[i], padx, pady, 4);
-		
+		//cout << " level " << i << levels_[i].size()  <<"scaled width " << scaled.width() << " height " << scaled.height() << endl;
 		// Second octave at the original resolution
-		if (i + interval <= maxScale)
+		if (i + interval <= maxScale){
 			Hog(scaled, levels_[i + interval], padx, pady, 8);
+			//cout << " level i+interval" << i + interval << " " << levels_[i + interval].size()  <<"scaled width " << scaled.width() << " height " << scaled.height() << endl;
+		}
 		
 		// Remaining octaves
 		for (int j = 2; i + j * interval <= maxScale; ++j) {
+			
 			scale *= 0.5;
 			scaled = image.resize(image.width() * scale + 0.5, image.height() * scale + 0.5);
 			Hog(scaled, levels_[i + j * interval], padx, pady, 8);
+			//cout << " level i+j*interval" << i + j * interval << " " << levels_[i + j * interval].size()  <<"scaled width " << scaled.width() << " height " << scaled.height() << endl;
 		}
 #else
 		Hog(scaled.scanLine(0), scaled.width(), scaled.height(), scaled.depth(), levels_[i], 4);
@@ -333,10 +337,11 @@ void HOGPyramid::Hog(const JPEGImage & image, Level & level, int padx, int pady,
 	assert(pady >= 1);
 	assert((cellSize == 8) || (cellSize == 4));
 	
-	// Resize the feature matrix
+	// Resize the feature matrix//level [i] 8910scaled width 343 height 228
 	level = Level::Constant((height + cellSize / 2) / cellSize + pady * 2,
 							(width + cellSize / 2) / cellSize + padx * 2, Cell::Zero());
 	
+	cout << " level r c"<< level.rows() <<" "<< level.cols() << endl;
 	for (int y = 0; y < height; ++y) {
 		const int yp = min(y + 1, height - 1);
 		const int ym = max(y - 1, 0);

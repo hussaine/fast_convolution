@@ -63,6 +63,9 @@ public:
 	/// the last feature, which is assumed to be one.
 	Patchwork(const HOGPyramid & pyramid);
 	
+	//// Return plans size
+	int planeSize();
+
 	/// Returns the amount of horizontal zero padding (in cells).
 	int padx() const;
 	

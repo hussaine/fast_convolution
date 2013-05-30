@@ -201,7 +201,7 @@ void Mixture::convolve(const HOGPyramid & pyramid,
 	int i;
 #pragma omp parallel for private(i)
 	for (i = 0; i < nbModels; ++i) {
-		cout << "Inside Mixture-convolve2, model convolve each" << endl;
+		//cout << "Inside Mixture-convolve2, model convolve each nbModels " << i << " " << nbModels << endl;
 		vector<vector<HOGPyramid::Matrix> > tmp(models_[i].parts_.size());
 		
 		for (size_t j = 0; j < tmp.size(); ++j)

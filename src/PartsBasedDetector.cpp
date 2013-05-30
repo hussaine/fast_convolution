@@ -82,6 +82,14 @@ void PartsBasedDetector<T>::detect(const Mat& im, const Mat& depth, vectorCandid
 	/////test code - Hussain
 	cout << " Starting Convolution - in PBM-detect function " << endl;
 	convolution_engine_->pdf(pyramid, pdf);
+	cout << " convolution size " << pdf.size() << endl;
+	for (int pdfInd=0;pdfInd<pdf.size();pdfInd++)
+		for (int pdfInd2=0;pdfInd2<pdf[1].size();pdfInd2++){
+		Mat response;
+		response=pdf[pdfInd][pdfInd2];
+		cout << "pdf dim " << response.rows << " " << response.cols << endl;
+	}
+
 	cout << " End Convolution - in PBM-detect function " << endl;
 	printf("Convolution time: %f\n", ((double)getTickCount() - t)/getTickFrequency());
 

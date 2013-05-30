@@ -69,6 +69,7 @@
 #ifndef _WIN32
 #include <sys/time.h>
 
+
 timeval Start, Stop;
 
 inline void start()
@@ -91,6 +92,53 @@ inline int stop()
 using namespace cv;
 //using namespace FFLD;
 using namespace std;
+using namespace Eigen;
+
+template<typename _Tp, int _rows, int _cols, int _options, int _maxRows, int _maxCols>
+void eigen2cv( const Eigen::Matrix<_Tp, _rows, _cols, _options, _maxRows, _maxCols>& src, Mat& dst )
+{
+    if( !(src.Flags & Eigen::RowMajorBit) )
+    {
+        Mat _src(src.cols(), src.rows(), DataType<_Tp>::type,
+              (void*)src.data(), src.stride()*sizeof(_Tp));
+        transpose(_src, dst);
+    }
+    else
+    {
+        Mat _src(src.rows(), src.cols(), DataType<_Tp>::type,
+                 (void*)src.data(), src.stride()*sizeof(_Tp));
+        _src.copyTo(dst);
+    }
+}
+
+template<typename _Tp>
+void cv2eigen( const Mat& src,
+               Eigen::Matrix<_Tp, Eigen::Dynamic, Eigen::Dynamic>& dst )
+{
+    dst.resize(src.rows, src.cols);
+    if( !(dst.Flags & Eigen::RowMajorBit) )
+    {
+        Mat _dst(src.cols, src.rows, DataType<_Tp>::type,
+             dst.data(), (size_t)(dst.stride()*sizeof(_Tp)));
+        if( src.type() == _dst.type() )
+            transpose(src, _dst);
+        else if( src.cols == src.rows )
+        {
+            src.convertTo(_dst, _dst.type());
+            transpose(_dst, _dst);
+        }
+        else
+            Mat(src.t()).convertTo(_dst, _dst.type());
+        CV_DbgAssert(_dst.data == (uchar*)dst.data());
+    }
+    else
+    {
+        Mat _dst(src.rows, src.cols, DataType<_Tp>::type,
+                 dst.data(), (size_t)(dst.stride()*sizeof(_Tp)));
+        src.convertTo(_dst, _dst.type());
+        CV_DbgAssert(_dst.data == (uchar*)dst.data());
+    }
+}
 
 
 int main(int argc, char** argv) {
@@ -107,7 +155,7 @@ int main(int argc, char** argv) {
 	vector<FFLD::HOGPyramid::Matrix> scores;
 	vector<FFLD::Mixture::Indices> argmaxes;
 	vector<vector<vector<FFLD::Model::Positions> > > positions;
-	const string file("../3.jpg");
+	const string file("../tmp.jpg");
 	cout << file << endl;
 	FFLD::JPEGImage image(file);
 	FFLD::HOGPyramid pyramidFFLD(image, padding, padding, interval);
@@ -119,7 +167,7 @@ int main(int argc, char** argv) {
 		
 	cout << "Initialized FFTW in " << stop() << " ms" << endl;
 	FFLD::Mixture mixture;
-	string modelffld("../bicycle.txt");
+	string modelffld("../model_car_final-1.2.4.txt");
 	cout << modelffld << endl;
 	ifstream in(modelffld.c_str(), ios::binary);
 	
@@ -130,7 +178,7 @@ int main(int argc, char** argv) {
 	}
 	in >> mixture;
 
-	mixture.convolve(pyramidFFLD, scores, argmaxes, &positions);
+	//mixture.convolve(pyramidFFLD, scores, argmaxes, &positions);//full ffld run
 	cout << "Convolution :p " << endl;
 	const int nbModels = mixture.models().size();
 	const int nbLevels = pyramidFFLD.levels().size();
@@ -148,7 +196,25 @@ int main(int argc, char** argv) {
 	std::vector<FFLD::Patchwork::Filter> filterCache_;
 	 filterCache_ = mixture.filterCacheObj();
 	vector<vector<FFLD::HOGPyramid::Matrix> > convolutions(filterCache_.size());
-	patchwork.convolve(filterCache_, convolutions);
+	patchwork.convolve(filterCache_, convolutions);///convolve patch with filters, 
+	 const int tmpnbFilters = 54, tmpnbPlanes = 12, tmpnbLevels = 41;
+	 //nb filters is number of filters (Read from model.txt)
+	 // nblevels is number of HOGPyramid levels
+	// nbplanes comes from converting pyramid to patchwork, rectangle logic ?
+	 Mat C;
+	for (int i = 0; i < tmpnbFilters * tmpnbPlanes; ++i) {
+		const int k = i / tmpnbPlanes; // Filter index
+		const int l = i % tmpnbPlanes; // Plane index
+		for (int j = 0; j < tmpnbLevels; ++j) {
+			FFLD::HOGPyramid::Matrix ffldResponse = convolutions[k][j];
+			FFLD::HOGPyramid::Matrix tempffldResponse;
+			eigen2cv(ffldResponse,C);
+
+			cout << "ffldResponse dim " << ffldResponse.rows() << " " << ffldResponse.cols() << " C dim " << C.rows << " " << C.cols << endl;
+		}
+	}
+	
+	//cout << " convolution size " << convolutions.size() << "rows " << convolutions[1].rows() << endl;
 	// convert the convolusions Eigen matrix to cvMat obj
 
 	cout << " Mixture model size " << nbModels << endl;
@@ -194,11 +260,12 @@ int main(int argc, char** argv) {
 		// convert the depth image from mm to m
 		depth = depth / 1000.0f;
 	}
-
+	
 	// detect potential candidates in the image
 	double t = (double)getTickCount();
 	vector<Candidate> candidates;
 	pbd.detect(im, depth, candidates);
+	cout << " image dim " << im.rows << " " << im.cols << endl;
 	printf("Detection time: %f\n", ((double)getTickCount() - t)/getTickFrequency());
 	printf("Number of candidates: %ld\n", candidates.size());
 

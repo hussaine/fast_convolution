@@ -106,6 +106,11 @@ interval_(pyramid.interval())
 #endif
 }
 
+int Patchwork::planeSize()
+{
+	return planes_.size();
+}
+
 int Patchwork::padx() const
 {
 	return padx_;
@@ -204,7 +209,7 @@ void Patchwork::convolve(const vector<Filter> & filters,
 		for (int j = 0; j < nbLevels; ++j) {
 			const int rows = rectangles_[j].first.height() + pady_ - filters[k].second.first + 1;
 			const int cols = rectangles_[j].first.width() + padx_ - filters[k].second.second + 1;
-			
+			//cout << "i-nbfilters*nbplanes & k-i/nbplanes & j-nblevels " << i << " " << k << " " << j << " " << rows << " " << cols << " nbFilters " << nbFilters << " nbPlanes " << nbPlanes << " nbLevels " << nbLevels << endl;
 			if ((rows > 0) && (cols > 0) && (rectangles_[j].second == l)) {
 				const int x = rectangles_[j].first.x();
 				const int y = rectangles_[j].first.y();

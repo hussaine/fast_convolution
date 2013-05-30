@@ -45,11 +45,11 @@ void SpatialConvolutionEngine::convolve(const Mat& feature, vectorFilterEngine& 
 	//cout << " inside SpatialConvolutionEngine-Convolve function - convolution code here " << endl;
 	// error checking
 	assert(feature.depth() == type_);
-
+	
 	// split the feature into separate channels
 	vectorMat featurev;
 	split(feature.reshape(stride), featurev);
-
+	//cout << " featurev " << " "<< featurev[1].cols <<" "<< featurev[1].rows << " stride " << stride << endl;
 	// calculate the output
 	Rect roi(0,0,-1,-1); // full image
 	Point offset(0,0);
@@ -59,6 +59,8 @@ void SpatialConvolutionEngine::convolve(const Mat& feature, vectorFilterEngine& 
 	for (unsigned int c = 0; c < stride; ++c) {
 		Mat pdfc(fsize, type_);
 		filter[c]->apply(featurev[c], pdfc, roi, offset, true);
+		
+		//cout << " filter " << " "<< filter[c].cols <<" "<< filter[c].rows << " stride " << stride << endl;
 		pdf += pdfc;
 	}
 }
@@ -90,8 +92,10 @@ void SpatialConvolutionEngine::pdf(const vectorMat& features, vector2DMat& respo
 			Mat response;
 			convolve(features[m], filters_[n], response, flen_);
 			responses[m][n] = response;
+			//cout << " convolution filter " << " " << response.cols <<" "<< response.rows << endl;
+			
 		}
-		cout << " feature size " << M << " filter size " << N  << " filter n " << n << " with feature m "<<  endl;
+		//cout << " feature size " << M << " filter size " << N  << " filter n " << n << " with feature m "<<  endl;
 	}
 	
 
@@ -106,7 +110,7 @@ void SpatialConvolutionEngine::pdf(const vectorMat& features, vector2DMat& respo
  * @param filters the filters
  */
 void SpatialConvolutionEngine::setFilters(const vectorMat& filters) {
-
+	cout << " inside set filters " << endl;
 	const unsigned int N = filters.size();
 	filters_.clear();
 	filters_.resize(N);
@@ -122,6 +126,7 @@ void SpatialConvolutionEngine::setFilters(const vectorMat& filters) {
 		for (unsigned int m = 0; m < C-1; ++m) {
 			Ptr<FilterEngine> fe = createLinearFilter(type_, type_,
 					filtervec[m], Point(-1,-1), 0, BORDER_CONSTANT, -1, Scalar(0,0,0,0));
+			//cout << " filter dims " << m << " " << C << " " << N << filtervec[m].rows << " " << filtervec[m].cols << endl;
 			filter_engines[m] = fe;
 		}
 
