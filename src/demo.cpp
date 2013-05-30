@@ -111,15 +111,14 @@ void eigen2cv( const Eigen::Matrix<_Tp, _rows, _cols, _options, _maxRows, _maxCo
     }
 }
 
-template<typename _Tp>
 void cv2eigen( const Mat& src,
-               Eigen::Matrix<_Tp, Eigen::Dynamic, Eigen::Dynamic>& dst )
+               FFLD::HOGPyramid::Matrix & dst )
 {
     dst.resize(src.rows, src.cols);
     if( !(dst.Flags & Eigen::RowMajorBit) )
     {
-        Mat _dst(src.cols, src.rows, DataType<_Tp>::type,
-             dst.data(), (size_t)(dst.stride()*sizeof(_Tp)));
+        Mat _dst(src.cols, src.rows, DataType<float>::type,
+             dst.data(), (size_t)(dst.stride()*sizeof(float)));
         if( src.type() == _dst.type() )
             transpose(src, _dst);
         else if( src.cols == src.rows )
@@ -133,8 +132,8 @@ void cv2eigen( const Mat& src,
     }
     else
     {
-        Mat _dst(src.rows, src.cols, DataType<_Tp>::type,
-                 dst.data(), (size_t)(dst.stride()*sizeof(_Tp)));
+        Mat _dst(src.rows, src.cols, DataType<float>::type,
+                 dst.data(), (size_t)(dst.stride()*sizeof(float)));
         src.convertTo(_dst, _dst.type());
         CV_DbgAssert(_dst.data == (uchar*)dst.data());
     }
@@ -209,8 +208,8 @@ int main(int argc, char** argv) {
 			FFLD::HOGPyramid::Matrix ffldResponse = convolutions[k][j];
 			FFLD::HOGPyramid::Matrix tempffldResponse;
 			eigen2cv(ffldResponse,C);
-
-			cout << "ffldResponse dim " << ffldResponse.rows() << " " << ffldResponse.cols() << " C dim " << C.rows << " " << C.cols << endl;
+			cv2eigen(C,tempffldResponse);
+			cout << "ffldResponse dim " << ffldResponse.rows() << " " << ffldResponse.cols() << " C dim " << C.rows << " " << C.cols << " ffld::Eigen dim " << tempffldResponse.rows() << " " << tempffldResponse.cols() <<endl;
 		}
 	}
 	
