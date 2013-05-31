@@ -82,6 +82,7 @@ void SpatialConvolutionEngine::pdf(const vectorMat& features, vector2DMat& respo
 	const unsigned int M = features.size();
 	const unsigned int N = filters_.size();
 	responses.resize(M, vectorMat(N));
+	cout << " responses.resize(M, vectorMat(N)) " << M << " " << N << endl;
 	// iterate
 #ifdef _OPENMP
 	omp_set_num_threads(8);
@@ -92,7 +93,7 @@ void SpatialConvolutionEngine::pdf(const vectorMat& features, vector2DMat& respo
 			Mat response;
 			convolve(features[m], filters_[n], response, flen_);
 			responses[m][n] = response;
-			//cout << " convolution filter " << " " << response.cols <<" "<< response.rows << endl;
+			//cout << " convolution filter response to vector2Dmat" << " " << response.cols <<" "<< response.rows << " " << response.type() << " " << response.channels() << endl;
 			
 		}
 		//cout << " feature size " << M << " filter size " << N  << " filter n " << n << " with feature m "<<  endl;

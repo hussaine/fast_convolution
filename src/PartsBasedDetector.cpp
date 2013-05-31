@@ -42,8 +42,68 @@
 #include "SpatialConvolutionEngine.hpp"
 #include <cstdio>
 #include <iostream>
+
+// FFLD datastructures
+#include "SimpleOpt.h"
+#include "Intersector.h"
+#include "Mixture.h"
+#include "Scene.h"
+#include <algorithm>
+#include <fstream>
+#include <iomanip>
+#include "HOGPyramid.h"
+#include "Patchwork.h"
+#include "IFeatures.hpp"
+#include "JPEGImage.h"
+
 using namespace cv;
 using namespace std;
+using namespace Eigen;
+
+template<typename _Tp, int _rows, int _cols, int _options, int _maxRows, int _maxCols>
+void eigen2cv( const Eigen::Matrix<_Tp, _rows, _cols, _options, _maxRows, _maxCols>& src, Mat& dst )
+{
+    if( !(src.Flags & Eigen::RowMajorBit) )
+    {
+        Mat _src(src.cols(), src.rows(), DataType<_Tp>::type,
+              (void*)src.data(), src.stride()*sizeof(_Tp));
+        transpose(_src, dst);
+    }
+    else
+    {
+        Mat _src(src.rows(), src.cols(), DataType<_Tp>::type,
+                 (void*)src.data(), src.stride()*sizeof(_Tp));
+        _src.copyTo(dst);
+    }
+}
+
+void cv2eigen( const Mat& src,
+               FFLD::HOGPyramid::Matrix & dst )
+{
+    dst.resize(src.rows, src.cols);
+    if( !(dst.Flags & Eigen::RowMajorBit) )
+    {
+        Mat _dst(src.cols, src.rows, DataType<float>::type,
+             dst.data(), (size_t)(dst.stride()*sizeof(float)));
+        if( src.type() == _dst.type() )
+            transpose(src, _dst);
+        else if( src.cols == src.rows )
+        {
+            src.convertTo(_dst, _dst.type());
+            transpose(_dst, _dst);
+        }
+        else
+            Mat(src.t()).convertTo(_dst, _dst.type());
+        CV_DbgAssert(_dst.data == (uchar*)dst.data());
+    }
+    else
+    {
+        Mat _dst(src.rows, src.cols, DataType<float>::type,
+                 dst.data(), (size_t)(dst.stride()*sizeof(float)));
+        src.convertTo(_dst, _dst.type());
+        CV_DbgAssert(_dst.data == (uchar*)dst.data());
+    }
+}
 
 /*! @brief search an image for potential candidates
  *
@@ -80,15 +140,85 @@ void PartsBasedDetector<T>::detect(const Mat& im, const Mat& depth, vectorCandid
 	vector2DMat pdf;
 	
 	/////test code - Hussain
+	cout << "FFLD Convolution Part Starting " << endl;
+	int padding = 12;
+	int interval = 10;
+	vector<FFLD::HOGPyramid::Matrix> scores;
+	vector<FFLD::Mixture::Indices> argmaxes;
+	vector<vector<vector<FFLD::Model::Positions> > > positions;
+	const string file("../tmp.jpg");
+	cout << file << endl;
+	FFLD::JPEGImage image(file);
+	FFLD::HOGPyramid pyramidFFLD(image, padding, padding, interval);
+	//FFLD::HOGPyramid BrisPyra2PyramidFFLD;
+	
+	if (!FFLD::Patchwork::Init((pyramidFFLD.levels()[0].rows() - padding + 15) & ~15,
+							(pyramidFFLD.levels()[0].cols() - padding + 15) & ~15)) {
+		cout << "\nCould not initialize the Patchwork class" << endl;
+		//return -1;
+	}
+		
+	cout << "Initialized FFTW in " << endl;
+	FFLD::Mixture mixture;
+	string modelffld("../model_car_final-1.2.4.txt");
+	cout << modelffld << endl;
+	ifstream in(modelffld.c_str(), ios::binary);
+	
+	if (!in.is_open()) {
+		//showUsage();
+		cerr << "\nInvalid model file " << modelffld << endl;
+		//return -1;
+	}
+	in >> mixture;
+	const int nbModels = mixture.models().size();
+	const int nbLevels = pyramidFFLD.levels().size();
+	vector<vector<FFLD::HOGPyramid::Matrix> > tmp(nbModels);
+
+
+#pragma omp critical
+	mixture.cacheFilters();
+
+	const FFLD::Patchwork patchwork(pyramidFFLD);
+	std::vector<FFLD::Patchwork::Filter> filterCache_;
+	filterCache_ = mixture.filterCacheObj();
+	vector<vector<FFLD::HOGPyramid::Matrix> > convolutions(filterCache_.size());
+	patchwork.convolve(filterCache_, convolutions);///convolve patch with filters, 
+	cout << " done patch work convolution " << endl;
+	const int tmpnbFilters = 54, tmpnbPlanes = 12, tmpnbLevels = 41;
+
+	//just test code to transfer convolution matrix of ffld to vector2dMat of bristow
+	Mat C;
+	vector2DMat pdfFFLD;
+	// preallocate the output
+	//const unsigned int M = features.size();//inner loop, reducing pyramind 
+	//const unsigned int N = filters_.size();//outer loop
+	//responses.resize(M, vectorMat(N));
+	pdfFFLD.resize(tmpnbLevels, vectorMat(tmpnbFilters * tmpnbPlanes));
+	//Mat D;
+	for (int i = 0; i < tmpnbFilters * tmpnbPlanes; ++i) {
+		const int k = i / tmpnbPlanes; // Filter index
+		const int l = i % tmpnbPlanes; // Plane index
+		for (int j = 0; j < tmpnbLevels; ++j) {
+			FFLD::HOGPyramid::Matrix ffldResponse = convolutions[k][j];
+			FFLD::HOGPyramid::Matrix tempffldResponse;
+			eigen2cv(ffldResponse,C);
+			//D=C;
+			pdfFFLD[j][i]=C;
+			//cout << "transfer i & j " << i << " " << j << endl;
+			cv2eigen(C,tempffldResponse);
+			cout << "ffldResponse dim " << ffldResponse.rows() << " " << ffldResponse.cols() << " C dim " << C.rows << " " << C.cols << " " << C.type()  << " " << C.channels() <<" ffld::Eigen dim " << tempffldResponse.rows() << " " << tempffldResponse.cols() <<endl;
+		}
+	}
+	
 	cout << " Starting Convolution - in PBM-detect function " << endl;
 	convolution_engine_->pdf(pyramid, pdf);
-	cout << " convolution size " << pdf.size() << endl;
+	/*cout << " convolution size " << pdf.size() << endl;
 	for (int pdfInd=0;pdfInd<pdf.size();pdfInd++)
 		for (int pdfInd2=0;pdfInd2<pdf[1].size();pdfInd2++){
 		Mat response;
 		response=pdf[pdfInd][pdfInd2];
 		cout << "pdf dim " << response.rows << " " << response.cols << endl;
-	}
+	}*/
 
 	cout << " End Convolution - in PBM-detect function " << endl;
 	printf("Convolution time: %f\n", ((double)getTickCount() - t)/getTickFrequency());
@@ -98,6 +228,7 @@ void PartsBasedDetector<T>::detect(const Mat& im, const Mat& depth, vectorCandid
 	vector2DMat rootv, rooti;
 	t = (double)getTickCount();
 	dp_.min(parts_, pdf, Ix, Iy, Ik, rootv, rooti);
+	//dp_.min(parts_, pdfFFLD, Ix, Iy, Ik, rootv, rooti);
 	printf("DP min time: %f\n", ((double)getTickCount() - t)/getTickFrequency());
 
 	// suppress non-maximal candidates

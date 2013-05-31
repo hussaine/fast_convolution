@@ -94,55 +94,10 @@ using namespace cv;
 using namespace std;
 using namespace Eigen;
 
-template<typename _Tp, int _rows, int _cols, int _options, int _maxRows, int _maxCols>
-void eigen2cv( const Eigen::Matrix<_Tp, _rows, _cols, _options, _maxRows, _maxCols>& src, Mat& dst )
-{
-    if( !(src.Flags & Eigen::RowMajorBit) )
-    {
-        Mat _src(src.cols(), src.rows(), DataType<_Tp>::type,
-              (void*)src.data(), src.stride()*sizeof(_Tp));
-        transpose(_src, dst);
-    }
-    else
-    {
-        Mat _src(src.rows(), src.cols(), DataType<_Tp>::type,
-                 (void*)src.data(), src.stride()*sizeof(_Tp));
-        _src.copyTo(dst);
-    }
-}
-
-void cv2eigen( const Mat& src,
-               FFLD::HOGPyramid::Matrix & dst )
-{
-    dst.resize(src.rows, src.cols);
-    if( !(dst.Flags & Eigen::RowMajorBit) )
-    {
-        Mat _dst(src.cols, src.rows, DataType<float>::type,
-             dst.data(), (size_t)(dst.stride()*sizeof(float)));
-        if( src.type() == _dst.type() )
-            transpose(src, _dst);
-        else if( src.cols == src.rows )
-        {
-            src.convertTo(_dst, _dst.type());
-            transpose(_dst, _dst);
-        }
-        else
-            Mat(src.t()).convertTo(_dst, _dst.type());
-        CV_DbgAssert(_dst.data == (uchar*)dst.data());
-    }
-    else
-    {
-        Mat _dst(src.rows, src.cols, DataType<float>::type,
-                 dst.data(), (size_t)(dst.stride()*sizeof(float)));
-        src.convertTo(_dst, _dst.type());
-        CV_DbgAssert(_dst.data == (uchar*)dst.data());
-    }
-}
-
 
 int main(int argc, char** argv) {
 
-	int padding = 12;
+	/*int padding = 12;
 	int interval = 10;
 
 	// check arguments
@@ -200,7 +155,7 @@ int main(int argc, char** argv) {
 	 //nb filters is number of filters (Read from model.txt)
 	 // nblevels is number of HOGPyramid levels
 	// nbplanes comes from converting pyramid to patchwork, rectangle logic ?
-	 Mat C;
+	/* Mat C;
 	for (int i = 0; i < tmpnbFilters * tmpnbPlanes; ++i) {
 		const int k = i / tmpnbPlanes; // Filter index
 		const int l = i % tmpnbPlanes; // Plane index
@@ -211,13 +166,13 @@ int main(int argc, char** argv) {
 			cv2eigen(C,tempffldResponse);
 			cout << "ffldResponse dim " << ffldResponse.rows() << " " << ffldResponse.cols() << " C dim " << C.rows << " " << C.cols << " ffld::Eigen dim " << tempffldResponse.rows() << " " << tempffldResponse.cols() <<endl;
 		}
-	}
+	}*/
 	
 	//cout << " convolution size " << convolutions.size() << "rows " << convolutions[1].rows() << endl;
 	// convert the convolusions Eigen matrix to cvMat obj
 
-	cout << " Mixture model size " << nbModels << endl;
-
+	//cout << " Mixture model size " << nbModels << endl;
+	
 
 
 	// determine the type of model to read

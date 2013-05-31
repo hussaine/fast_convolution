@@ -111,6 +111,8 @@ void HOGFeatures<T>::pyramid(const Mat& im, vectorMat& pyrafeatures) {
 	scales_.clear();
 	scales_.resize(nscales_);
 
+	//cout << "interval " << interval_ << endl;
+
 	// perform the non-power of two scaling
 	// TODO: is this the most intuitive way to represent scaling?
 	#ifdef _OPENMP
