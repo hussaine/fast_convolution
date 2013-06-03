@@ -36,7 +36,7 @@ using namespace std;
 
 HOGPyramid::HOGPyramid() : padx_(0), pady_(0), interval_(0)
 {
-	cout << " Enpty FFLD Pyramid " << endl;
+	cout << " Empty FFLD Pyramid " << endl;
 }
 
 HOGPyramid::HOGPyramid(int padx, int pady, int interval, const vector<Level> & levels) : padx_(0),
@@ -49,6 +49,8 @@ pady_(0), interval_(0)
 	pady_ = pady;
 	interval_ = interval;
 	levels_ = levels;
+	cout << "FFLD pyramid with pad " << padx << " intervals " << interval << " levels " << levels_.size() << endl;
+	cout << "and fist level is of " << levels_[0].rows() << " " << levels_[0].cols() << endl; 
 }
 
 HOGPyramid::HOGPyramid(const JPEGImage & image, int padx, int pady, int interval) : padx_(0),
@@ -56,10 +58,10 @@ pady_(0), interval_(0)
 {
 	if (image.empty() || (padx < 1) || (pady < 1) || (interval < 1))
 		return;
-	cout << " Creating FFLD Pyramid " << padx << " " << interval << endl;
+	cout << " Creating FFLD Pyramid padding " << padx << " intervals " << interval << endl;
 	// Copmute the number of scales such that the smallest size of the last level is 5
 	const int maxScale = ceil(log(min(image.width(), image.height()) / 40.0) / log(2.0)) * interval;
-	cout << " Max Scale " << maxScale << endl;
+	cout << "FFLD Max Scale " << maxScale << endl;
 	// Cannot compute the pyramid on images too small
 	if (maxScale < interval)
 		return;
@@ -79,11 +81,20 @@ pady_(0), interval_(0)
 		// First octave at twice the image resolution
 #ifndef FFLD_HOGPYRAMID_FELZENSZWALB_FEATURES
 		Hog(scaled, levels_[i], padx, pady, 4);
-		//cout << " level " << i << levels_[i].size()  <<"scaled width " << scaled.width() << " height " << scaled.height() << endl;
+		//cout << " level " << i <<" "<< levels_[i].size()  <<" scaled width " << scaled.width() << " height " << scaled.height() << endl;
+		
+		Matrix tmpMat = Convert(levels_[i]);
+		cout << " level " << i <<" "<< levels_[i].size()  <<" levels rows " << levels_[i].rows() << " cols "  << levels_[i].cols() << endl;
+		cout << " interval "<< i <<" level to Eigen Matrix R & C "<< tmpMat.rows() << " " << tmpMat.cols() << endl;
+		levels_[i]=Convert(tmpMat);
+		cout << " Eigen Matrix back to level " << i <<" "<< levels_[i].size()  <<" levels rows " << levels_[i].rows() << " cols "  << levels_[i].cols() << endl;
 		// Second octave at the original resolution
 		if (i + interval <= maxScale){
 			Hog(scaled, levels_[i + interval], padx, pady, 8);
 			//cout << " level i+interval" << i + interval << " " << levels_[i + interval].size()  <<"scaled width " << scaled.width() << " height " << scaled.height() << endl;
+		//	tmpMat = Convert(levels_[i+interval]);
+		//	cout << " interval octave"<< i+interval <<" level to Eigen Matrix R & C "<< tmpMat.rows() << " " << tmpMat.cols() << endl;
+			
 		}
 		
 		// Remaining octaves
@@ -93,6 +104,8 @@ pady_(0), interval_(0)
 			scaled = image.resize(image.width() * scale + 0.5, image.height() * scale + 0.5);
 			Hog(scaled, levels_[i + j * interval], padx, pady, 8);
 			//cout << " level i+j*interval" << i + j * interval << " " << levels_[i + j * interval].size()  <<"scaled width " << scaled.width() << " height " << scaled.height() << endl;
+			tmpMat = Convert(levels_[i+j*interval]);
+			//cout << " interval octave "<< i+j*interval <<" level to Eigen Matrix R & C "<< tmpMat.rows() << " " << tmpMat.cols() << endl;
 		}
 #else
 		Hog(scaled.scanLine(0), scaled.width(), scaled.height(), scaled.depth(), levels_[i], 4);
@@ -235,6 +248,20 @@ Map<HOGPyramid::Matrix, Aligned> HOGPyramid::Convert(Level & level)
 											  level.cols() * NbFeatures);
 }
 
+FFLD::HOGPyramid::Level HOGPyramid::Convert(HOGPyramid::Matrix & Mat )
+{
+	HOGPyramid::Level result(Mat.rows(), Mat.cols()/32);
+	
+	for (int y = 0; y < Mat.rows(); ++y)
+		for (int x = 0; x < Mat.cols()/32; ++x)
+			for (int i = 0; i < NbFeatures; ++i){
+				result(y, x)(i) = Mat(y,x*NbFeatures+i);
+			}
+			return result;
+	//return Level(Mat.data()->data(),Mat.rows(),Mat.cols()/32);
+
+}
+
 Map<const HOGPyramid::Matrix, Aligned> HOGPyramid::Convert(const Level & level)
 {
 	return Map<const Matrix, Aligned>(level.data()->data(), level.rows(),
@@ -341,7 +368,7 @@ void HOGPyramid::Hog(const JPEGImage & image, Level & level, int padx, int pady,
 	level = Level::Constant((height + cellSize / 2) / cellSize + pady * 2,
 							(width + cellSize / 2) / cellSize + padx * 2, Cell::Zero());
 	
-	cout << " level r c"<< level.rows() <<" "<< level.cols() << endl;
+	//cout << " level r c"<< level.rows() <<" "<< level.cols() << endl;
 	for (int y = 0; y < height; ++y) {
 		const int yp = min(y + 1, height - 1);
 		const int ym = max(y - 1, 0);

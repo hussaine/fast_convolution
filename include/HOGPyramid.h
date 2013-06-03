@@ -134,6 +134,8 @@ public:
 	/// @note The size of the matrix will be rows x (cols * NbFeatures).
 	static Eigen::Map<Matrix, Eigen::Aligned> Convert(Level & level);
 	
+
+	HOGPyramid::Level Convert(HOGPyramid::Matrix & Mat );
 	/// Converts a const pyramid level to a simple const matrix (useful to apply standard matrix
 	/// operations to it).
 	/// @note The size of the matrix will be rows x (cols * NbFeatures).

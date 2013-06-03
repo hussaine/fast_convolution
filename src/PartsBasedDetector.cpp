@@ -105,6 +105,21 @@ void cv2eigen( const Mat& src,
     }
 }
 
+FFLD::HOGPyramid::Level Convert(FFLD::HOGPyramid::Matrix & Mat )
+{
+	FFLD::HOGPyramid::Level result(Mat.rows(), Mat.cols()/32);
+	int NbFeatures=32;
+
+	for (int y = 0; y < Mat.rows(); ++y)
+		for (int x = 0; x < Mat.cols()/32; ++x)
+			for (int i = 0; i < NbFeatures; ++i){
+				result(y, x)(i) = Mat(y,x*NbFeatures+i);
+			}
+			return result;
+	//return Level(Mat.data()->data(),Mat.rows(),Mat.cols()/32);
+
+}
+
 /*! @brief search an image for potential candidates
  *
  * calls detect(const Mat& im, const Mat&depth=Mat(), vector<Candidate>& candidates);
@@ -140,9 +155,56 @@ void PartsBasedDetector<T>::detect(const Mat& im, const Mat& depth, vectorCandid
 	vector2DMat pdf;
 	
 	/////test code - Hussain
+	//creat a test pyramid ffld of same dim as pyramid Bristow
+	///creat empty bristow pyramid and copy the original pyramid to it from mat structure
+	//levels_.resize(maxScale + 1);
+	//levels_ = levels;
+	vector<FFLD::HOGPyramid::Level> levels(10);
+	
+	cout << " Bristow pyramid size " << pyramid.size() << endl;
+	int stride=32;
+	vectorMat pyramidCopy;	
+	for (int pyr=0;pyr<pyramid.size();pyr++){
+		Mat py=pyramid[pyr];
+		cout << " py reshapes to vector Mat " << py.rows << " " << py.cols << " " << py.channels() << endl;
+		///pyramid to cvmat is py, now cvmat to eigen mat
+		FFLD::HOGPyramid::Matrix tmpffldMat;
+		cv2eigen(py,tmpffldMat);
+		cout << "cvmat to eigen mat " << tmpffldMat.rows() << " " << tmpffldMat.cols() << endl;
+		///now eigen mat to pyramid level
+		levels[pyr]=Convert(tmpffldMat);
+		cout << "eigen mat to level " << levels[pyr].rows() << " " << levels[pyr].cols() << endl;
+
+
+		/*Mat pyre=py.reshape(stride);
+		cout << " pyre reshapes to vector Mat " << pyre.rows << " " << pyre.cols << " " << pyre.channels() << endl;
+		Mat pyrere=pyre.reshape(1);
+		cout << " pyre reshapes to vector Mat " << pyrere.rows << " " << pyrere.cols << " " << pyrere.channels() << endl;
+		
+		*/
+		/*vectorMat featurev;
+		split(py.reshape(stride), featurev);
+		
+		vectorMat tmpfeaurev;
+		
+		for (int pyc=0;pyc<stride;pyc++){
+		cout << "pyramid size level " << pyr << " r & c " << featurev[pyc].rows << " " << featurev[pyc].cols << endl; 
+		Mat tmpMat=featurev[pyc];
+		}*/
+	}
+	// creat a ffld pyramid with bristows copy
+	FFLD::HOGPyramid BrisPyra2PyramidFFLD(6,6,3,levels);
+	const FFLD::Patchwork patchworkBristow(BrisPyra2PyramidFFLD);
+	std::vector<FFLD::Patchwork::Filter> bristowFilterCache_;
+	FFLD::Mixture bristowMixture;
+	/*bristowFilterCache_ = bristowMixture.filterCacheObj();
+	vector<vector<FFLD::HOGPyramid::Matrix> > bristowConvolutions(bristowFilterCache_.size());*/
+	//patchwork.convolve(filterCache_, convolutions);
+	//split(feature.reshape(stride), featurev);
+
 	cout << "FFLD Convolution Part Starting " << endl;
-	int padding = 12;
-	int interval = 10;
+	int padding = 6;
+	int interval = 3;
 	vector<FFLD::HOGPyramid::Matrix> scores;
 	vector<FFLD::Mixture::Indices> argmaxes;
 	vector<vector<vector<FFLD::Model::Positions> > > positions;
@@ -150,7 +212,9 @@ void PartsBasedDetector<T>::detect(const Mat& im, const Mat& depth, vectorCandid
 	cout << file << endl;
 	FFLD::JPEGImage image(file);
 	FFLD::HOGPyramid pyramidFFLD(image, padding, padding, interval);
-	//FFLD::HOGPyramid BrisPyra2PyramidFFLD;
+	//cout << "ffld pyramid size " << pyramidFFLD.size() << endl;
+	FFLD::HOGPyramid::Matrix levelMat;
+	
 	
 	if (!FFLD::Patchwork::Init((pyramidFFLD.levels()[0].rows() - padding + 15) & ~15,
 							(pyramidFFLD.levels()[0].cols() - padding + 15) & ~15)) {
@@ -184,10 +248,10 @@ void PartsBasedDetector<T>::detect(const Mat& im, const Mat& depth, vectorCandid
 	vector<vector<FFLD::HOGPyramid::Matrix> > convolutions(filterCache_.size());
 	patchwork.convolve(filterCache_, convolutions);///convolve patch with filters, 
 	cout << " done patch work convolution " << endl;
-	const int tmpnbFilters = 54, tmpnbPlanes = 12, tmpnbLevels = 41;
+	const int tmpnbFilters = 54, tmpnbPlanes = 12, tmpnbLevels = 41;// need the right dim here, after changing ffld matrix
 
 	//just test code to transfer convolution matrix of ffld to vector2dMat of bristow
-	Mat C;
+	/*Mat C;
 	vector2DMat pdfFFLD;
 	// preallocate the output
 	//const unsigned int M = features.size();//inner loop, reducing pyramind 
@@ -206,10 +270,10 @@ void PartsBasedDetector<T>::detect(const Mat& im, const Mat& depth, vectorCandid
 			pdfFFLD[j][i]=C;
 			//cout << "transfer i & j " << i << " " << j << endl;
 			cv2eigen(C,tempffldResponse);
-			cout << "ffldResponse dim " << ffldResponse.rows() << " " << ffldResponse.cols() << " C dim " << C.rows << " " << C.cols << " " << C.type()  << " " << C.channels() <<" ffld::Eigen dim " << tempffldResponse.rows() << " " << tempffldResponse.cols() <<endl;
+			//cout << "ffldResponse dim " << ffldResponse.rows() << " " << ffldResponse.cols() << " C dim " << C.rows << " " << C.cols << " " << C.type()  << " " << C.channels() <<" ffld::Eigen dim " << tempffldResponse.rows() << " " << tempffldResponse.cols() <<endl;
 		}
 	}
-	
+	*/
 	cout << " Starting Convolution - in PBM-detect function " << endl;
 	convolution_engine_->pdf(pyramid, pdf);
 	/*cout << " convolution size " << pdf.size() << endl;

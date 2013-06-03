@@ -219,7 +219,8 @@ void Mixture::cacheFilters() const
 	
 	for (size_t i = 0; i < models_.size(); ++i)
 		nbFilters += models_[i].parts_.size();
-	
+
+	cout << "nbFilters " << nbFilters << endl;
 	// Transform all the filters
 	filterCache_.resize(nbFilters);
 	

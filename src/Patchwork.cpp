@@ -335,6 +335,8 @@ void Patchwork::TransformFilter(const HOGPyramid::Level & filter, Filter & resul
 	result.first = Plane::Constant(MaxRows_, HalfCols_, Cell::Zero());
 	result.second = pair<int, int>(filter.rows(), filter.cols());
 	
+	cout << "filter R & C" << filter.rows() << " " << filter.cols() <<endl;
+
 	Map<HOGPyramid::Level, Aligned> plane(reinterpret_cast<HOGPyramid::Cell *>(result.first.data()),
 										  MaxRows_, HalfCols_ * 2);
 	
