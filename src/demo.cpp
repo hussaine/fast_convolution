@@ -197,11 +197,12 @@ int main(int argc, char** argv) {
 		exit(-3);
 	}
 
+	cout << " Calling Distribute Model " << endl;
 	// create the PartsBasedDetector and distribute the model parameters
 	PartsBasedDetector<float> pbd;
 	pbd.distributeModel(*model);
 
-	
+	cout << " After Distribute Model " << endl;
 	// load the image from file
 	Mat_<float> depth;
 	Mat im = imread(argv[2]);

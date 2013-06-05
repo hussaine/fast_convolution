@@ -54,7 +54,7 @@ public:
 	 * @param responses a 2D vector of pdfs, 1st dimension across scale, 2nd dimension across filter
 	 */
 	virtual void pdf(const vectorMat& features, vector2DMat& responses) = 0;
-
+	virtual vector2DFilterEngine filters()=0;
 	/*! @brief set the convolve engine filters
 	 *
 	 * In many situations, the filters are static during operation of the detector

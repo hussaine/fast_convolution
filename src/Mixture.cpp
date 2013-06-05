@@ -227,9 +227,11 @@ void Mixture::cacheFilters() const
 	for (size_t i = 0, j = 0; i < models_.size(); ++i) {
 		int k;
 #pragma omp parallel for private(k)
-		for (k = 0; k < models_[i].parts_.size(); ++k)
+		for (k = 0; k < models_[i].parts_.size(); ++k){
 			Patchwork::TransformFilter(models_[i].parts_[k].filter, filterCache_[j + k]);
-		
+			//cout << " j+K " << j+k << endl;
+			//cout << " transformed filter size " << filterCache_[j+k].size() << " " << filterCache_[j+k].rows() << " " <<  filterCache_[j+k].cols() << endl;
+		}
 		j += models_[i].parts_.size();
 	}
 	

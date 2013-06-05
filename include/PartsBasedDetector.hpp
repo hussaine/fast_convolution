@@ -164,6 +164,9 @@ private:
 	Parts parts_;
 	//! the search space pruner
 	SearchSpacePruning<T> ssp_;
+
+	///store filters in vectorMat format to fwd ffld
+	vectorMat pdbFilters;
 public:
 	PartsBasedDetector() {}
 	virtual ~PartsBasedDetector() {}

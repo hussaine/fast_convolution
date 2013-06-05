@@ -25,6 +25,10 @@ SpatialConvolutionEngine::~SpatialConvolutionEngine() {
 	// TODO Auto-generated destructor stub
 }
 
+vector2DFilterEngine SpatialConvolutionEngine::filters(){
+	return filters_;
+}
+
 /*! @brief Convolve two matrices, with a stride of greater than one
  *
  * This is a specialized 2D convolution algorithm with a stride of greater
@@ -58,9 +62,7 @@ void SpatialConvolutionEngine::convolve(const Mat& feature, vectorFilterEngine& 
 
 	for (unsigned int c = 0; c < stride; ++c) {
 		Mat pdfc(fsize, type_);
-		filter[c]->apply(featurev[c], pdfc, roi, offset, true);
-		
-		//cout << " filter " << " "<< filter[c].cols <<" "<< filter[c].rows << " stride " << stride << endl;
+		filter[c]->apply(featurev[c], pdfc, roi, offset, true);		
 		pdf += pdfc;
 	}
 }
@@ -115,7 +117,7 @@ void SpatialConvolutionEngine::setFilters(const vectorMat& filters) {
 	const unsigned int N = filters.size();
 	filters_.clear();
 	filters_.resize(N);
-
+	cout << " Bristow's filter size in vectorMat :) " << N << endl; 
 	// split each filter into separate channels, and create a filter engine
 	const unsigned int C = flen_;
 	for (unsigned int n = 0; n < N; ++n) {

@@ -145,35 +145,27 @@ void PartsBasedDetector<T>::detect(const cv::Mat& im, vectorCandidate& candidate
 template<typename T>
 void PartsBasedDetector<T>::detect(const Mat& im, const Mat& depth, vectorCandidate& candidates) {
 
-	// calculate a feature pyramid for the new image
+		// calculate a feature pyramid for the new image
 	vectorMat pyramid;
 	features_->pyramid(im, pyramid);
 
-	// convolve the feature pyramid with the Part experts
-	// to get probability density for each Part
-	double t = (double)getTickCount();
-	vector2DMat pdf;
-	
-	/////test code - Hussain
-	//creat a test pyramid ffld of same dim as pyramid Bristow
-	///creat empty bristow pyramid and copy the original pyramid to it from mat structure
-	//levels_.resize(maxScale + 1);
-	//levels_ = levels;
-	vector<FFLD::HOGPyramid::Level> levels(10);
+	//step 1: import pyramid, and init patchwork
+	int padding = 1;
+	vector<FFLD::HOGPyramid::Level> levels(pyramid.size());
 	
 	cout << " Bristow pyramid size " << pyramid.size() << endl;
 	int stride=32;
 	vectorMat pyramidCopy;	
 	for (int pyr=0;pyr<pyramid.size();pyr++){
 		Mat py=pyramid[pyr];
-		cout << " py reshapes to vector Mat " << py.rows << " " << py.cols << " " << py.channels() << endl;
+		//cout << " py reshapes to vector Mat " << py.rows << " " << py.cols << " " << py.channels() << endl;
 		///pyramid to cvmat is py, now cvmat to eigen mat
 		FFLD::HOGPyramid::Matrix tmpffldMat;
 		cv2eigen(py,tmpffldMat);
-		cout << "cvmat to eigen mat " << tmpffldMat.rows() << " " << tmpffldMat.cols() << endl;
+		//cout << "cvmat to eigen mat " << tmpffldMat.rows() << " " << tmpffldMat.cols() << endl;
 		///now eigen mat to pyramid level
 		levels[pyr]=Convert(tmpffldMat);
-		cout << "eigen mat to level " << levels[pyr].rows() << " " << levels[pyr].cols() << endl;
+		//cout << "eigen mat to level " << levels[pyr].rows() << " " << levels[pyr].cols() << endl;
 
 
 		/*Mat pyre=py.reshape(stride);
@@ -193,18 +185,107 @@ void PartsBasedDetector<T>::detect(const Mat& im, const Mat& depth, vectorCandid
 		}*/
 	}
 	// creat a ffld pyramid with bristows copy
-	FFLD::HOGPyramid BrisPyra2PyramidFFLD(6,6,3,levels);
+	FFLD::HOGPyramid BrisPyra2PyramidFFLD(padding,padding,3,levels);
+	cout << " pyramid specs " << BrisPyra2PyramidFFLD.levels()[0].rows() << " " << BrisPyra2PyramidFFLD.levels()[0].cols() << endl;
+		if (!FFLD::Patchwork::Init((BrisPyra2PyramidFFLD.levels()[0].rows() - padding + 15) & ~15,
+							(BrisPyra2PyramidFFLD.levels()[0].cols() - padding + 15) & ~15)) {
+		cout << "\nCould not initialize the Patchwork class" << endl;
+		//return -1;
+	}
 	const FFLD::Patchwork patchworkBristow(BrisPyra2PyramidFFLD);
-	std::vector<FFLD::Patchwork::Filter> bristowFilterCache_;
-	FFLD::Mixture bristowMixture;
-	/*bristowFilterCache_ = bristowMixture.filterCacheObj();
-	vector<vector<FFLD::HOGPyramid::Matrix> > bristowConvolutions(bristowFilterCache_.size());*/
-	//patchwork.convolve(filterCache_, convolutions);
+
+	//step 2: transfer filters
+	//no need for filter engine
+	vector2DFilterEngine bristowFilters=convolution_engine_->filters();
+	//convert vector2D filter to cvmat
+	vector<FFLD::HOGPyramid::Level> levels4Filters(bristowFilters.size());
+	for (int tempj=0;tempj<bristowFilters.size();tempj++) {
+		Mat py=pdbFilters[tempj];
+		//cout << " filter size " << pdbFilters.size() <<" " << py.rows << " " << py.cols << endl;
+		//cout << " py reshapes to vector Mat " << py.rows << " " << py.cols << " " << py.channels() << endl;
+		FFLD::HOGPyramid::Matrix tmpffldMat;
+		cv2eigen(py,tmpffldMat);
+		//cout << "cvmat to eigen mat " << tmpffldMat.rows() << " " << tmpffldMat.cols() << endl;
+		levels4Filters[tempj]=Convert(tmpffldMat);
+		//cout << "eigen mat to level " << levels4Filters[tempj].rows() << " " << levels4Filters[tempj].cols() << endl;
+		//levels4Filters[tempi]=bristowFilters[tempi];
+	}
+
+	cout << "transforming filters to cache " << endl;
+
+	std::vector<FFLD::Patchwork::Filter> bristowFilterCache_(bristowFilters.size());
+	for (int tempi=0;tempi<bristowFilters.size();tempi++){
+		//std::vector<cv::Ptr<cv::FilterEngine> > tmpFilterEngine=bristowFilters[tempi];
+		//cv::Ptr<cv::FilterEngine>  tmp2FilterEngine=tmpFilterEngine[0];
+		//cout << " tmpFilter Enginer size " << tmp2FilterEngine.size() << " " << tmp2FilterEngine.rows << " " << tmp2FilterEngine.cols << endl;
+		//Mat filterEngineI=tmpFilterEngine;
+		FFLD::Patchwork::TransformFilter(levels4Filters[tempi],bristowFilterCache_[tempi]);
+	}
+	cout << "imported filters of size " << bristowFilters.size() << endl;
+
+		cout << " Bristow filters transform to cache " << endl;
+
+	vector<vector<FFLD::HOGPyramid::Matrix> > bristowConvolutions(bristowFilterCache_.size());
+	patchworkBristow.convolve(bristowFilterCache_, bristowConvolutions);
+
+	cout << " Done Convolution in FFLD, " << endl;
+
+	cout << " FFLDs Bristow convolution size " << bristowConvolutions.size() << " " << bristowConvolutions[0].size() << endl;
+	Mat C;
+	vector2DMat pdfFFLD;
+	//const int tmpnbFilters = 27, tmpnbPlanes = 3, tmpnbLevels = 10;
+	/*pdfFFLD.resize(tmpnbLevels, vectorMat(tmpnbFilters * tmpnbPlanes));
+		for (int i = 0; i < tmpnbFilters * tmpnbPlanes; ++i) {
+		const int k = i / tmpnbPlanes; // Filter index
+		const int l = i % tmpnbPlanes; // Plane index
+		for (int j = 0; j < tmpnbLevels; ++j) {
+			FFLD::HOGPyramid::Matrix ffldResponse = bristowConvolutions[k][j];
+			FFLD::HOGPyramid::Matrix tempffldResponse;
+			eigen2cv(ffldResponse,C);
+			pdfFFLD[j][i]=C;
+			//cout << "transfer i & j " << i << " " << j << endl;
+			//cv2eigen(C,tempffldResponse);
+			cout << " C dim convo ffld my modiefied " << i << " " << j << " " << C.rows << " " << C.cols << " "<< C.channels() << endl;
+		}
+	}*/
+	pdfFFLD.resize(bristowConvolutions[0].size(), vectorMat(bristowConvolutions.size()));
+	for (int i = 0; i < bristowConvolutions[0].size(); i++)
+		for (int j=0; j < bristowConvolutions.size(); j++){
+			FFLD::HOGPyramid::Matrix ffldResponse = bristowConvolutions[j][i];
+			FFLD::HOGPyramid::Matrix tempffldResponse;
+			eigen2cv(ffldResponse,C);
+			pdfFFLD[i][j]=C;
+			//cout << " C dim convo ffld my modiefied " << i << " " << j << " " << C.rows << " " << C.cols << " "<< C.channels() << endl;
+		}
+	// convolve the feature pyramid with the Part experts
+	// to get probability density for each Part
+	
+	
+	/////test code - Hussain
+	//creat a test pyramid ffld of same dim as pyramid Bristow
+	///creat empty bristow pyramid and copy the original pyramid to it from mat structure
+	//levels_.resize(maxScale + 1);
+	//levels_ = levels;
+
+
+/*
+
+
+	
+
+
+	//responses.resize(M, vectorMat(N));
+
+	//Patchwork::TransformFilter(const HOGPyramid::Level & filter, Filter & result);
+	//FFLD::Mixture bristowMixture;
+	//bristowFilterCache_ = bristowMixture.filterCacheObj();
+	
+	*/
 	//split(feature.reshape(stride), featurev);
 
 	cout << "FFLD Convolution Part Starting " << endl;
-	int padding = 6;
-	int interval = 3;
+	
+/*	int interval = 3;
 	vector<FFLD::HOGPyramid::Matrix> scores;
 	vector<FFLD::Mixture::Indices> argmaxes;
 	vector<vector<vector<FFLD::Model::Positions> > > positions;
@@ -246,13 +327,24 @@ void PartsBasedDetector<T>::detect(const Mat& im, const Mat& depth, vectorCandid
 	std::vector<FFLD::Patchwork::Filter> filterCache_;
 	filterCache_ = mixture.filterCacheObj();
 	vector<vector<FFLD::HOGPyramid::Matrix> > convolutions(filterCache_.size());
-	patchwork.convolve(filterCache_, convolutions);///convolve patch with filters, 
+	patchwork.convolve(filterCache_, convolutions);///convolve patch with filters,
+	vector2DMat pdfFFLD2;
+	const int tmpnbFilters2 = 54, tmpnbPlanes2 = 4, tmpnbLevels2 = 13;
+	pdfFFLD2.resize(tmpnbLevels2, vectorMat(tmpnbFilters2 * tmpnbPlanes2));
+	cout << " convolutions size " << convolutions[0].size() << " " << convolutions.size() << endl;
+		for (int i = 0; i < convolutions[0].size(); i++)
+		for (int j=0; j < convolutions.size(); j++){
+			FFLD::HOGPyramid::Matrix ffldResponse = convolutions[j][i];
+			FFLD::HOGPyramid::Matrix tempffldResponse;
+			eigen2cv(ffldResponse,C);
+			pdfFFLD2[i][j]=C;
+			cout << " C dim convo ffld real " << i << " " << j << " " << C.rows << " " << C.cols << " "<< C.channels() << endl;
+		}*/
 	cout << " done patch work convolution " << endl;
-	const int tmpnbFilters = 54, tmpnbPlanes = 12, tmpnbLevels = 41;// need the right dim here, after changing ffld matrix
-
+	//const int tmpnbFilters = 54, tmpnbPlanes = 12, tmpnbLevels = 41;// need the right dim here, after changing ffld matrix
+	
 	//just test code to transfer convolution matrix of ffld to vector2dMat of bristow
-	/*Mat C;
-	vector2DMat pdfFFLD;
+	/*
 	// preallocate the output
 	//const unsigned int M = features.size();//inner loop, reducing pyramind 
 	//const unsigned int N = filters_.size();//outer loop
@@ -274,16 +366,20 @@ void PartsBasedDetector<T>::detect(const Mat& im, const Mat& depth, vectorCandid
 		}
 	}
 	*/
+	double t = (double)getTickCount();
+	vector2DMat pdf;
 	cout << " Starting Convolution - in PBM-detect function " << endl;
 	convolution_engine_->pdf(pyramid, pdf);
-	/*cout << " convolution size " << pdf.size() << endl;
+/*	cout << " convolution size " << pdf.size() << " " << pdf[0].size() << endl;
 	for (int pdfInd=0;pdfInd<pdf.size();pdfInd++)
-		for (int pdfInd2=0;pdfInd2<pdf[1].size();pdfInd2++){
+		for (int pdfInd2=0;pdfInd2<pdf[0].size();pdfInd2++){
 		Mat response;
 		response=pdf[pdfInd][pdfInd2];
 		cout << "pdf dim " << response.rows << " " << response.cols << endl;
-	}*/
-
+		response=pdfFFLD[pdfInd][pdfInd2];
+		cout << "pdfFFLD dim " << response.rows << " " << response.cols << endl;
+	}
+	*/
 	cout << " End Convolution - in PBM-detect function " << endl;
 	printf("Convolution time: %f\n", ((double)getTickCount() - t)/getTickFrequency());
 
@@ -291,8 +387,9 @@ void PartsBasedDetector<T>::detect(const Mat& im, const Mat& depth, vectorCandid
 	vector4DMat Ix, Iy, Ik;
 	vector2DMat rootv, rooti;
 	t = (double)getTickCount();
-	dp_.min(parts_, pdf, Ix, Iy, Ik, rootv, rooti);
-	//dp_.min(parts_, pdfFFLD, Ix, Iy, Ik, rootv, rooti);
+	//dp_.min(parts_, pdf, Ix, Iy, Ik, rootv, rooti);
+	cout << " got here dp" << endl;
+	dp_.min(parts_, pdfFFLD, Ix, Iy, Ik, rootv, rooti); // error is size of array
 	printf("DP min time: %f\n", ((double)getTickCount() - t)/getTickFrequency());
 
 	// suppress non-maximal candidates
@@ -332,7 +429,9 @@ void PartsBasedDetector<T>::distributeModel(Model& model) {
 	for (unsigned int n = 0; n < nfilters; ++n) {
 		model.filters()[n].convertTo(model.filters()[n], DataType<T>::type);
 	}
+
 	convolution_engine_->setFilters(model.filters());
+	pdbFilters=model.filters(); // hussain: filters to matvector format
 
 	// initialize the tree of Parts
 	parts_ = Parts(model.filters(), model.filtersi(), model.def(), model.defi(), model.bias(), model.biasi(),

@@ -49,7 +49,7 @@ pady_(0), interval_(0)
 	pady_ = pady;
 	interval_ = interval;
 	levels_ = levels;
-	cout << "FFLD pyramid with pad " << padx << " intervals " << interval << " levels " << levels_.size() << endl;
+	cout << "FFLD pyramid with pad " << padx << " " << pady << " " << " intervals " << interval << " levels " << levels_.size() << endl;
 	cout << "and fist level is of " << levels_[0].rows() << " " << levels_[0].cols() << endl; 
 }
 

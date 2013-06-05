@@ -24,6 +24,7 @@ public:
 	virtual ~SpatialConvolutionEngine();
 	virtual void setFilters(const vectorMat& filters);
 	virtual void pdf(const vectorMat& features, vector2DMat& responses);
+	virtual vector2DFilterEngine filters();
 };
 
 #endif /* SPATIALCONVOLUTIONENGINE_HPP_ */

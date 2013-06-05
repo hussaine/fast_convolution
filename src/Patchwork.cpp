@@ -50,8 +50,10 @@ Patchwork::Patchwork(const HOGPyramid & pyramid) : padx_(pyramid.padx()), pady_(
 interval_(pyramid.interval())
 {
 	cout << "Inside Patchwork-constructor, pyramid to patchwork, fft" << endl;
+	//cout << "pad " << pyramid.padx() << " " << pyramid.pady() << endl;
 	// Remove the padding from the bottom/right sides since convolutions with Fourier wrap around
 	const int nbLevels = pyramid.levels().size();
+	//cout << " nbLevels " << nbLevels << endl;
 	
 	rectangles_.resize(nbLevels);
 	
@@ -62,10 +64,11 @@ interval_(pyramid.interval())
 	
 	// Build the patchwork planes
 	const int nbPlanes = BLF(rectangles_);
-	
+	cout << "nbPlanes, if plane is -1, means rectangle is bigger than max rows * max col :( " << nbPlanes << endl;
 	// Constructs an empty patchwork in case of error
-	if (nbPlanes <= 0)
-		return;
+	if (nbPlanes <= 0){
+		cout << " exit :(" << endl;
+		return;}
 	
 	planes_.resize(nbPlanes);
 	
@@ -80,13 +83,21 @@ interval_(pyramid.interval())
 			for (int x = 0; x < MaxCols_; ++x)
 				plane(y, x)(HOGPyramid::NbFeatures - 1) = 1.0f;
 	}
-	
+
+	/*	for (int i = 0; i < nbLevels; ++i) {
+		cout << " hello " << MaxRows_ << " " << HalfCols_ * 2 << " " << nbLevels << " " << pyramid.levels()[i].cols() - padx_ << endl;
+		}
+	*/
 	// Recopy the pyramid levels into the planes
 	for (int i = 0; i < nbLevels; ++i) {
+		//cout << " hello " << MaxRows_ << " " << MaxCols_ << endl;
+
 		Map<HOGPyramid::Level, Aligned>
 			plane(reinterpret_cast<HOGPyramid::Cell *>(planes_[rectangles_[i].second].data()),
 				  MaxRows_, HalfCols_ * 2);
+
 		
+
 		plane.block(rectangles_[i].first.y(), rectangles_[i].first.x(),
 					rectangles_[i].first.height(), rectangles_[i].first.width()) =
 			pyramid.levels()[i].topLeftCorner(rectangles_[i].first.height(),
@@ -136,9 +147,9 @@ void Patchwork::convolve(const vector<Filter> & filters,
 {
 	cout << "Inside Patchwork-convolve function, dot product, and ifft" << endl;
 	const int nbFilters = filters.size();
-	const int nbPlanes = planes_.size();
+	const int nbPlanes =  planes_.size();
 	const int nbLevels = rectangles_.size();
-	
+	//cout << " nbFilters " << nbFilters << " nbPlanes " << nbPlanes << " nbLevels " << nbLevels << endl;
 	// Early return if the patchwork or the filters are empty
 	if (empty() || !nbFilters) {
 		convolutions.clear();
@@ -207,10 +218,15 @@ void Patchwork::convolve(const vector<Filter> & filters,
 #endif
 		
 		for (int j = 0; j < nbLevels; ++j) {
-			const int rows = rectangles_[j].first.height() + pady_ - filters[k].second.first + 1;
-			const int cols = rectangles_[j].first.width() + padx_ - filters[k].second.second + 1;
+			const int rows = rectangles_[j].first.height() + 1 ;// just test hussain + pady_ - filters[k].second.first ;
+			const int cols = rectangles_[j].first.width() + 1 ;// againd ust test+ padx_ - filters[k].second.second ;
+			//cout << "rows " << rectangles_[j].first.height() << " + " << pady_ << " - " << filters[k].second.first + 1 << endl;
+			//cout << "cols " << rectangles_[j].first.width() << " + " << padx_ << " - " << filters[k].second.second + 1 << endl;
+
+			//cout << " j rows cols rectangle " <<j << " " << rows << " " << cols << " " << l << " == " << rectangles_[j].second << endl;
 			//cout << "i-nbfilters*nbplanes & k-i/nbplanes & j-nblevels " << i << " " << k << " " << j << " " << rows << " " << cols << " nbFilters " << nbFilters << " nbPlanes " << nbPlanes << " nbLevels " << nbLevels << endl;
 			if ((rows > 0) && (cols > 0) && (rectangles_[j].second == l)) {
+				
 				const int x = rectangles_[j].first.x();
 				const int y = rectangles_[j].first.y();
 				const int width = rectangles_[j].first.width();
@@ -230,6 +246,7 @@ void Patchwork::convolve(const vector<Filter> & filters,
 					if (cols > width)
 						convolutions[k][j].rightCols(cols - width).fill(output(y, x));
 				}
+				//cout << " k & j " << k << " " << j << " convo dim " << convolutions[k][j].rows() << "  " << convolutions[k][j].rows() << endl;
 			}
 		}
 	}
@@ -298,7 +315,7 @@ bool Patchwork::Init(int maxRows, int maxCols)
 		fclose(file);
 	}
 #endif
-	
+	//cout << " now setting maxRows and Cols " << maxRows << " " << maxCols << endl;
 	// If successful, set MaxRows_, MaxCols_, HalfCols_, Forwards_ and Inverse_
 	if (forwards && inverse) {
 		MaxRows_ = maxRows;
@@ -325,9 +342,12 @@ int Patchwork::MaxCols()
 void Patchwork::TransformFilter(const HOGPyramid::Level & filter, Filter & result)
 {
 	//cout << "Inside Patchwork-TransferFilter, filter to fft" << endl;
+	//cout << filter.size() << " " << MaxRows_ << " " << filter.rows() << "  " << MaxCols_ << " " <<filter.cols()<< endl;
 	// Early return if no filter given or if Init was not called or if the filter is too large
 	if (!filter.size() || !MaxRows_ || (filter.rows() > MaxRows_) || (filter.cols() > MaxCols_)) {
 		result = Filter();
+		
+		cout << " no Filter got here :( " << endl;
 		return;
 	}
 	
@@ -335,7 +355,7 @@ void Patchwork::TransformFilter(const HOGPyramid::Level & filter, Filter & resul
 	result.first = Plane::Constant(MaxRows_, HalfCols_, Cell::Zero());
 	result.second = pair<int, int>(filter.rows(), filter.cols());
 	
-	cout << "filter R & C" << filter.rows() << " " << filter.cols() <<endl;
+	//cout << "filter R & C" << filter.rows() << " " << filter.cols() <<endl;
 
 	Map<HOGPyramid::Level, Aligned> plane(reinterpret_cast<HOGPyramid::Cell *>(result.first.data()),
 										  MaxRows_, HalfCols_ * 2);
@@ -345,6 +365,7 @@ void Patchwork::TransformFilter(const HOGPyramid::Level & filter, Filter & resul
 			plane((MaxRows_ - y) % MaxRows_, (MaxCols_ - x) % MaxCols_) = filter(y, x) /
 																		  (MaxRows_ * MaxCols_);
 	
+	
 	// Transform that plane	
 #ifndef FFLD_HOGPYRAMID_DOUBLE
 	fftwf_execute_dft_r2c(Forwards_, reinterpret_cast<float *>(plane.data()->data()),
@@ -353,6 +374,7 @@ void Patchwork::TransformFilter(const HOGPyramid::Level & filter, Filter & resul
 	fftw_execute_dft_r2c(Forwards_, reinterpret_cast<double *>(plane.data()->data()),
 						 reinterpret_cast<fftw_complex *>(result.first.data()->data()));
 #endif
+	
 }
 
 namespace FFLD
@@ -404,7 +426,7 @@ int Patchwork::BLF(vector<pair<Rectangle, int> > & rectangles)
 	// Order the rectangles by decreasing area. If a rectangle is bigger than MaxRows x MaxCols
 	// return -1
 	vector<int> ordering(rectangles.size());
-	
+	cout << " rectangles size " << rectangles.size() << endl;
 	for (int i = 0; i < rectangles.size(); ++i) {
 		if ((rectangles[i].first.width() > MaxCols_) || (rectangles[i].first.height() > MaxRows_))
 			return -1;
@@ -415,8 +437,9 @@ int Patchwork::BLF(vector<pair<Rectangle, int> > & rectangles)
 	sort(ordering.begin(), ordering.end(), detail::AreaComparator(rectangles));
 	
 	// Index of the plane containing each rectangle
-	for (int i = 0; i < rectangles.size(); ++i)
+	for (int i = 0; i < rectangles.size(); ++i){
 		rectangles[i].second = -1;
+	}
 	
 	vector<set<Rectangle, detail::PositionComparator> > gaps;
 	
